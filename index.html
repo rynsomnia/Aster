@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Aster — Starmap Cartographer</title>
+  <style>html,body{margin:0;height:100%;background:#05060a}</style>
+</head>
+<body>
+  <!-- Full-screen mount -->
+  <script src="aster.js"></script>
+  <script>
+    // Full screen:
+    const app = Aster.mount();
+
+    // Or mount into your own sized container:
+    //   <div id="map" style="position:relative;width:800px;height:600px"></div>
+    //   const app = Aster.mount('#map');
+
+    // Programmatic API:
+    //   app.getState()        -> serializable object (stars, lanes, nations, settings)
+    //   app.loadState(obj)    -> restore a saved map
+    //   app.clear()           -> wipe the map
+    //   app.destroy()         -> tear down and remove listeners
+  </script>
+</body>
+</html>
