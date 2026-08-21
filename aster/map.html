@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Aster Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#05070b; --chrome:#0c1016; --chrome-2:#11161f; --raise:#161d27;
+  --line:#212a36; --line-hot:#2f3b4b; --text:#c4cede; --dim:#69788c;
+  --dimmer:#47535f; --amber:#e8a13c; --amber-soft:#f0c07a; --teal:#4c8f9b;
+  --panelw:308px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--text);
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent}
+canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;
+  cursor:grab;touch-action:none}
+canvas.drag{cursor:grabbing}
+button,input{font-family:inherit;color:inherit}
+
+#topbar{position:absolute;left:0;right:0;top:0;height:46px;z-index:20;display:flex;
+  align-items:center;gap:10px;padding:0 12px;background:linear-gradient(180deg,rgba(12,16,22,.97),rgba(12,16,22,.82));
+  border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
+#topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--amber),transparent);opacity:.3}
+#title{font:600 13px/1 "IBM Plex Mono";letter-spacing:.16em;text-transform:uppercase;
+  color:var(--amber);white-space:nowrap}
+#sub{font:400 11px/1 "IBM Plex Mono";color:var(--dimmer);white-space:nowrap}
+.grow{flex:1}
+#searchWrap{position:relative;width:230px;max-width:42vw}
+#search{width:100%;background:var(--void);border:1px solid var(--line);border-radius:2px;
+  padding:7px 9px;font-size:13px;outline:none}
+#search:focus{border-color:var(--teal)}
+#results{position:absolute;left:0;right:0;top:36px;background:var(--chrome-2);
+  border:1px solid var(--line-hot);border-radius:3px;max-height:290px;overflow-y:auto;
+  display:none;box-shadow:0 14px 36px rgba(0,0,0,.6);scrollbar-width:thin}
+#results.on{display:block}
+.res{display:flex;align-items:center;gap:8px;padding:7px 9px;cursor:pointer;font-size:13px;
+  border-bottom:1px solid rgba(33,42,54,.6)}
+.res:last-child{border-bottom:0}
+.res:hover,.res.hi{background:var(--raise)}
+.res .sw{width:8px;height:8px;border-radius:50%;flex:none}
+.res .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res .nt{font:500 9px/1 "IBM Plex Mono";color:var(--amber);letter-spacing:.06em}
+.icon{width:32px;height:32px;flex:none;border:1px solid var(--line);background:var(--chrome-2);
+  border-radius:3px;color:var(--dim);cursor:pointer;display:grid;place-items:center;padding:0}
+.icon:hover{color:var(--text);border-color:var(--line-hot)}
+.icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round}
+.icon[aria-pressed="true"]{color:var(--amber);border-color:#4a3a1c;background:#1a1409}
+
+#panel{position:absolute;right:0;top:46px;bottom:0;width:var(--panelw);z-index:19;
+  background:var(--chrome);border-left:1px solid var(--line);display:flex;flex-direction:column;
+  transition:transform .18s ease}
+#panel.hide{transform:translateX(100%)}
+#ptabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+#ptabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:10px 0 8px;
+  font:500 10px/1 "IBM Plex Mono";letter-spacing:.11em;text-transform:uppercase;
+  color:var(--dimmer);cursor:pointer}
+#ptabs button[aria-pressed="true"]{color:var(--amber);border-bottom-color:var(--amber)}
+.page{display:none;flex:1;overflow-y:auto;padding:14px;scrollbar-width:thin}
+.page.on{display:block}
+h3{font:600 10px/1 "IBM Plex Mono";letter-spacing:.13em;text-transform:uppercase;color:var(--dimmer);
+  margin:0 0 9px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.grp{margin-bottom:20px}
+.kv{display:flex;gap:8px;font-size:13px;margin-bottom:6px}
+.kv b{flex:none;width:70px;font:400 11px/1.4 "IBM Plex Mono";color:var(--dim);font-weight:400}
+.kv span{flex:1;min-width:0;word-break:break-word}
+#sysName{font:600 18px/1.2 "IBM Plex Sans Condensed";margin:0 0 3px}
+#sysKind{font:500 10px/1 "IBM Plex Mono";letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dimmer);margin:0 0 14px}
+.notes{background:var(--void);border:1px solid var(--line);border-left:2px solid var(--amber);
+  border-radius:2px;padding:11px 12px;font-size:13.5px;line-height:1.62;white-space:pre-wrap;
+  word-break:break-word}
+.empty{border:1px dashed var(--line-hot);padding:20px 14px;text-align:center;color:var(--dimmer);
+  font-size:12.5px;line-height:1.6;border-radius:2px}
+.lane{display:flex;align-items:center;gap:8px;padding:5px 7px;border:1px solid var(--line);
+  border-radius:2px;margin-bottom:5px;background:var(--chrome-2);cursor:pointer;font-size:12.5px}
+.lane:hover{border-color:var(--teal)}
+.lane .d{font:400 10px/1 "IBM Plex Mono";color:var(--dimmer);flex:none}
+.nat{display:flex;align-items:center;gap:8px;padding:6px 7px;border:1px solid var(--line);
+  border-radius:2px;margin-bottom:5px;background:var(--chrome-2);cursor:pointer}
+.nat:hover{border-color:var(--line-hot)}
+.nat .sw{width:13px;height:13px;border-radius:2px;flex:none;border:1px solid rgba(255,255,255,.2)}
+.nat .nm{flex:1;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nat .cnt{font:400 10px/1 "IBM Plex Mono";color:var(--dimmer)}
+.nat.off{opacity:.42}
+.check{display:flex;align-items:center;gap:8px;margin-bottom:9px;cursor:pointer;font-size:12.5px}
+.check input{accent-color:var(--amber);width:14px;height:14px;cursor:pointer}
+.btn{display:block;width:100%;padding:9px;background:var(--raise);border:1px solid var(--line-hot);
+  border-radius:2px;cursor:pointer;font:500 11px/1 "IBM Plex Mono";letter-spacing:.07em;
+  text-transform:uppercase;margin-top:8px}
+.btn:hover{border-color:var(--teal)}
+.btn.primary{background:#241a08;border-color:#5c4718;color:var(--amber-soft)}
+.hint{font-size:11.5px;line-height:1.6;color:var(--dimmer);margin:9px 0 0}
+
+#ptab{position:absolute;right:var(--panelw);top:56px;z-index:21;width:17px;height:36px;
+  background:var(--chrome);border:1px solid var(--line);border-right:0;border-radius:3px 0 0 3px;
+  color:var(--dimmer);cursor:pointer;font-size:11px;padding:0;transition:right .18s ease}
+#panel.hide~#ptab{right:0}
+#zoomers{position:absolute;left:12px;bottom:12px;z-index:20;display:flex;flex-direction:column;gap:6px}
+#status{position:absolute;left:0;right:var(--panelw);bottom:0;height:26px;z-index:18;
+  display:flex;align-items:center;gap:14px;padding:0 12px;font:400 11px/1 "IBM Plex Mono";
+  color:var(--dimmer);background:linear-gradient(0deg,rgba(12,16,22,.94),transparent);
+  pointer-events:none;justify-content:flex-end}
+#drop{position:absolute;inset:0;z-index:60;display:none;place-items:center;
+  background:rgba(3,5,8,.9);backdrop-filter:blur(3px);text-align:center;padding:24px}
+#drop.on{display:grid}
+#drop .inner{max-width:420px}
+#drop h1{font:600 15px/1 "IBM Plex Mono";letter-spacing:.16em;text-transform:uppercase;
+  color:var(--amber);margin:0 0 12px}
+#drop p{font-size:13px;line-height:1.65;color:var(--dim);margin:0 0 18px}
+#toast{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);z-index:70;
+  background:var(--chrome-2);border:1px solid var(--line-hot);border-left:2px solid var(--amber);
+  padding:8px 14px;font:400 12px/1 "IBM Plex Mono";border-radius:2px;opacity:0;
+  transition:opacity .18s;pointer-events:none}
+#toast.on{opacity:1}
+@media (max-width:720px){
+  :root{--panelw:100vw}
+  #panel{top:auto;left:0;bottom:0;height:56vh;border-left:0;border-top:1px solid var(--line)}
+  #panel.hide{transform:translateY(100%)}
+  #ptab{right:auto;left:50%;transform:translateX(-50%);top:auto;bottom:56vh;width:52px;height:16px;
+    border-radius:3px 3px 0 0;border:1px solid var(--line);border-bottom:0;transition:bottom .18s ease}
+  #panel.hide~#ptab{bottom:0;right:auto}
+  #status{right:0;bottom:auto;top:46px;background:none}
+  #title{font-size:11px}
+  #sub{display:none}
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="topbar">
+  <div id="title">Aster</div>
+  <div id="sub" data-role="mapname">—</div>
+  <div class="grow"></div>
+  <div id="searchWrap">
+    <input id="search" type="text" placeholder="Search systems…" autocomplete="off" spellcheck="false">
+    <div id="results"></div>
+  </div>
+  <button class="icon" id="bFit" title="Fit the whole map (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button class="icon" id="bOpen" title="Open a different map"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+</div>
+
+<div id="zoomers">
+  <button class="icon" id="bIn" title="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></button>
+  <button class="icon" id="bOut" title="Zoom out"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+</div>
+
+<div id="status"><span id="stCount"></span><span id="stZoom"></span></div>
+
+<aside id="panel">
+  <div id="ptabs">
+    <button data-p="sys" aria-pressed="true">System</button>
+    <button data-p="nat">Nations</button>
+    <button data-p="view">View</button>
+  </div>
+
+  <div class="page on" id="pg-sys">
+    <div id="sysEmpty" class="empty">Click any system to read its dossier.<br><br>Drag to pan · scroll or pinch to zoom.</div>
+    <div id="sysBody" style="display:none">
+      <h2 id="sysName"></h2>
+      <div id="sysKind"></div>
+      <div class="grp">
+        <div class="kv"><b>Nation</b><span id="sysNation"></span></div>
+        <div class="kv"><b>Position</b><span id="sysPos"></span></div>
+      </div>
+      <div class="grp" id="notesGrp">
+        <h3>Notes</h3>
+        <div id="sysNotes" class="notes"></div>
+      </div>
+      <div class="grp" id="laneGrp">
+        <h3>Hyperlanes</h3>
+        <div id="laneList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="pg-nat">
+    <div class="grp">
+      <h3>Nations</h3>
+      <div id="natList"></div>
+      <p class="hint">Click a nation to fly to its territory. The dot toggles its border on the map.</p>
+    </div>
+  </div>
+
+  <div class="page" id="pg-view">
+    <div class="grp">
+      <h3>Display</h3>
+      <label class="check"><input type="checkbox" id="vGlow"> Star glow</label>
+      <label class="check"><input type="checkbox" id="vLanes"> Hyperlanes</label>
+      <label class="check"><input type="checkbox" id="vNames"> System names</label>
+      <label class="check"><input type="checkbox" id="vNat"> Nation names</label>
+      <label class="check"><input type="checkbox" id="vBorders"> Nation borders</label>
+      <label class="check"><input type="checkbox" id="vGrid"> Coordinate grid</label>
+      <label class="check"><input type="checkbox" id="vAnnot"> Mark annotated systems</label>
+      <p class="hint">Turning glow off makes panning smoother on slower machines.</p>
+    </div>
+    <div class="grp">
+      <h3>Map</h3>
+      <div class="kv"><b>Systems</b><span data-role="nStars">—</span></div>
+      <div class="kv"><b>Lanes</b><span data-role="nLanes">—</span></div>
+      <div class="kv"><b>Nations</b><span data-role="nNations">—</span></div>
+      <div class="kv"><b>Notes</b><span data-role="nNotes">—</span></div>
+      <button class="btn" id="bOpen2">Open a different map</button>
+    </div>
+  </div>
+</aside>
+<button id="ptab" title="Show or hide the panel">›</button>
+
+<div id="drop"><div class="inner">
+  <h1>Aster Viewer</h1>
+  <p id="dropMsg">Drop an Aster map file here, or choose one to begin.</p>
+  <button class="btn primary" id="bChoose">Choose a map file</button>
+</div></div>
+
+<div id="toast"></div>
+<input type="file" id="fileMap" accept=".json,application/json" hidden>
+
+<!-- Paste a saved Aster map here to ship the viewer as one self-contained file. -->
+<script type="application/json" id="embedded-map">null</script>
+
+<script>
+"use strict";
+/* ============================================================
+   ASTER VIEWER — read-only. Rendering core is lifted verbatim
+   from the editor so a map looks identical in both.
+
+   Loading order, first hit wins:
+     1. ?map=<url>            query parameter
+     2. #embedded-map         inline JSON in this file
+     3. DEFAULT_MAP           path below, fetched alongside the page
+     4. the file picker / drag and drop
+   ============================================================ */
+const DEFAULT_MAP = 'map.json';
+
+const $ = s => document.querySelector(s);
+const cv = $('#cv'), ctx = cv.getContext('2d', {alpha:false});
+let W = 0, H = 0, DPR = 1;
+
+const cam = {x:0, y:0, z:1};
+const opt = {
+  bg:'#05070b', lane:'#3f7f8c', laneW:0.8,
+  glow:true, lanes:true, names:true, natNames:true, showNodes:false, grid:false, borders:true,
+  influence:60, smooth:2, fillAlpha:15, natNameScale:0.7, natNameExport:0.85,
+  textSize:64, textColor:'#8fa6bd', textOpacity:0.7, textSpacing:0.18,
+  textFont:'cond', textWeight:'400', textItalic:false, textAlign:'center', textHalo:true
+};
+let markAnnotated = false;
+
+const stars = new Map(), lanes = new Map(), nations = new Map(), texts = new Map();
+const layers = {
+  under:{img:null, src:null, x:0, y:0, scale:1, opacity:0.7, visible:true},
+  over: {img:null, src:null, x:0, y:0, scale:1, opacity:0.5, visible:true}
+};
+let selected = null;
+let borderCache = [], nationLabels = [], bordersDirty = true;
+
+/* ---------- spatial grid ---------- */
+const CELL = 128;
+const grid = new Map();
+const ck = (cx,cy) => cx + ',' + cy;
+function gAdd(s){
+  s._c = ck(Math.floor(s.x/CELL), Math.floor(s.y/CELL));
+  let b = grid.get(s._c); if(!b){ b = new Set(); grid.set(s._c, b); }
+  b.add(s.id);
+}
+function eachInRect(x0,y0,x1,y1,fn){
+  const cx0 = Math.floor(x0/CELL), cx1 = Math.floor(x1/CELL);
+  const cy0 = Math.floor(y0/CELL), cy1 = Math.floor(y1/CELL);
+  if((cx1-cx0+1)*(cy1-cy0+1) > 40000){ for(const s of stars.values()) fn(s); return; }
+  for(let cy=cy0; cy<=cy1; cy++) for(let cx=cx0; cx<=cx1; cx++){
+    const b = grid.get(ck(cx,cy)); if(!b) continue;
+    for(const id of b){ const s = stars.get(id); if(s) fn(s); }
+  }
+}
+const lk = (a,b) => a < b ? a+'|'+b : b+'|'+a;
+function computeBorders(){ computeBordersInner(); computeLabels(); }
+function dirtyBorders(){ bordersDirty = true; }
+
+/* ---------- load ---------- */
+function loadMap(d, label){
+  if(!d || d.format !== 'aster.map') throw new Error('not an Aster map');
+  stars.clear(); lanes.clear(); grid.clear(); nations.clear(); texts.clear();
+  selected = null;
+  Object.assign(opt, d.opt || {});
+  opt.showNodes = false;                    /* scaffolding stays hidden in the viewer */
+
+  nations.set(0, {id:0, name:'Unclaimed', color:'#000000', visible:false});
+  (d.nations || []).forEach(n => { if(n.id !== 0) nations.set(n.id, Object.assign({}, n)); });
+
+  (d.stars || []).forEach(s => {
+    const st = {
+      id:s.i, x:s.x, y:s.y, name:s.n || '',
+      type: s.t === 1 ? 'blackhole' : s.t === 2 ? 'node' : 'star',
+      color:s.c, size:s.z, nation:s.a || 0, notes:s.o || '', links:new Set()
+    };
+    stars.set(st.id, st); gAdd(st);
+  });
+  (d.lanes || []).forEach(p => {
+    const a = stars.get(p[0]), b = stars.get(p[1]);
+    if(!a || !b) return;
+    lanes.set(lk(p[0], p[1]), {a:p[0], b:p[1]});
+    a.links.add(p[1]); b.links.add(p[0]);
+  });
+  (d.texts || []).forEach(t => texts.set(t.id, Object.assign({}, t)));
+
+  for(const k of ['under','over']){
+    const L = (d.layers || {})[k];
+    Object.assign(layers[k], {img:null, src:null, visible:true});
+    if(L){
+      Object.assign(layers[k], {x:L.x, y:L.y, scale:L.scale, opacity:L.opacity,
+        visible:L.visible !== false, src:L.src});
+      if(L.src){
+        const im = new Image();
+        im.onload = () => { layers[k].img = im; draw(); };
+        im.src = L.src;
+      }
+    }
+  }
+
+  if(d.cam) Object.assign(cam, d.cam);
+  computeBorders();
+  buildIndex();
+  buildNations();
+  syncView();
+  stats(label);
+  $('#drop').classList.remove('on');
+  if(!d.cam) fitAll();
+  draw();
+}
+
+function stats(label){
+  let notes = 0, real = 0;
+  for(const s of stars.values()){
+    if(s.type === 'node') continue;
+    real++;
+    if(s.notes && s.notes.trim()) notes++;
+  }
+  document.querySelectorAll('[data-role="nStars"]').forEach(e => e.textContent = real.toLocaleString());
+  document.querySelectorAll('[data-role="nLanes"]').forEach(e => e.textContent = lanes.size.toLocaleString());
+  document.querySelectorAll('[data-role="nNations"]').forEach(e => e.textContent = (nations.size - 1));
+  document.querySelectorAll('[data-role="nNotes"]').forEach(e => e.textContent = notes.toLocaleString());
+  document.querySelectorAll('[data-role="mapname"]').forEach(e => e.textContent = label || '—');
+  $('#stCount').textContent = real.toLocaleString() + ' systems · ' + notes.toLocaleString() + ' annotated';
+}
+
+/* ---------- render ---------- */
+let rafPending = false;
+function draw(){ if(!rafPending){ rafPending = true; requestAnimationFrame(frame); } }
+function frame(){
+  rafPending = false;
+  if(bordersDirty){ bordersDirty = false; computeBorders(); }
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  drawScene(ctx, cam, W, H, {x0:0, y0:0, x1:W, y1:H}, {});
+  overlay(ctx);
+  $('#stZoom').textContent = 'zoom ' + (cam.z >= 10 ? cam.z.toFixed(0) : cam.z.toFixed(2));
+}
+function overlay(g){
+  const SX = wx => (wx - cam.x)*cam.z + W/2, SY = wy => (wy - cam.y)*cam.z + H/2;
+  if(markAnnotated){
+    const pad = 40/cam.z;
+    g.strokeStyle = 'rgba(232,161,60,.55)'; g.lineWidth = 1;
+    g.beginPath();
+    eachInRect(toWX(0)-pad, toWY(0)-pad, toWX(W)+pad, toWY(H)+pad, s => {
+      if(s.type === 'node' || !s.notes || !s.notes.trim()) return;
+      const r = Math.max(4.5, s.size*cam.z + 3.5);
+      g.moveTo(SX(s.x)+r, SY(s.y)); g.arc(SX(s.x), SY(s.y), r, 0, 6.2832);
+    });
+    g.stroke();
+  }
+  if(selected && stars.has(selected)){
+    const s = stars.get(selected);
+    const r = Math.max(9, s.size*cam.z + 7);
+    const px = SX(s.x), py = SY(s.y);
+    g.strokeStyle = '#e8a13c'; g.lineWidth = 1.4;
+    g.beginPath(); g.arc(px, py, r, 0, 6.2832); g.stroke();
+    g.globalAlpha = .5;
+    g.beginPath();
+    g.moveTo(px-r-6, py); g.lineTo(px-r-2, py);
+    g.moveTo(px+r+2, py); g.lineTo(px+r+6, py);
+    g.moveTo(px, py-r-6); g.lineTo(px, py-r-2);
+    g.moveTo(px, py+r+2); g.lineTo(px, py+r+6);
+    g.stroke();
+    g.globalAlpha = 1;
+  }
+}
+
+/* ---------- camera ---------- */
+const toWX = sx => (sx - W/2)/cam.z + cam.x;
+const toWY = sy => (sy - H/2)/cam.z + cam.y;
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = cv.clientWidth || innerWidth; H = cv.clientHeight || innerHeight;
+  if(!W || !H) return;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  draw();
+}
+addEventListener('resize', resize);
+addEventListener('load', resize);
+if(window.ResizeObserver) new ResizeObserver(resize).observe(cv);
+
+function fitAll(){
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, any = false;
+  for(const s of stars.values()){
+    if(s.type === 'node') continue;
+    any = true;
+    if(s.x < x0) x0 = s.x; if(s.x > x1) x1 = s.x;
+    if(s.y < y0) y0 = s.y; if(s.y > y1) y1 = s.y;
+  }
+  if(!any){ cam.x = cam.y = 0; cam.z = 1; return draw(); }
+  const pad = Math.max(60, (x1-x0)*0.06);
+  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  cam.x = (x0+x1)/2; cam.y = (y0+y1)/2;
+  cam.z = clamp(Math.min(W/(x1-x0), H/(y1-y0)), 0.005, 60);
+  draw();
+}
+function flyTo(x, y, z){
+  const sx = cam.x, sy = cam.y, sz = cam.z;
+  const tz = z != null ? clamp(z, 0.005, 60) : cam.z;
+  const t0 = performance.now(), dur = 420;
+  (function step(){
+    const k = Math.min(1, (performance.now()-t0)/dur);
+    const e = k < .5 ? 2*k*k : 1-Math.pow(-2*k+2, 2)/2;
+    cam.x = sx + (x-sx)*e; cam.y = sy + (y-sy)*e;
+    cam.z = sz * Math.pow(tz/sz, e);
+    draw();
+    if(k < 1) requestAnimationFrame(step);
+  })();
+}
+
+/* ---------- pointer: drag pans, tap selects ---------- */
+const pointers = new Map();
+let panFrom = null, pinch = null, moved = 0;
+
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, {x:e.offsetX, y:e.offsetY});
+  moved = 0;
+  if(pointers.size === 1){
+    panFrom = {sx:e.offsetX, sy:e.offsetY, cx:cam.x, cy:cam.y};
+    cv.classList.add('drag');
+  } else if(pointers.size === 2){
+    const p = [...pointers.values()];
+    pinch = {d:Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y), z:cam.z,
+             mx:(p[0].x+p[1].x)/2, my:(p[0].y+p[1].y)/2};
+    pinch.wx = toWX(pinch.mx); pinch.wy = toWY(pinch.my);
+    panFrom = null;
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if(!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, {x:e.offsetX, y:e.offsetY});
+  if(pinch && pointers.size === 2){
+    const p = [...pointers.values()];
+    const d = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+    if(pinch.d > 0){
+      cam.z = clamp(pinch.z * (d/pinch.d), 0.005, 60);
+      cam.x = pinch.wx - (pinch.mx - W/2)/cam.z;
+      cam.y = pinch.wy - (pinch.my - H/2)/cam.z;
+      draw();
+    }
+    return;
+  }
+  if(panFrom){
+    const dx = e.offsetX - panFrom.sx, dy = e.offsetY - panFrom.sy;
+    moved = Math.max(moved, Math.hypot(dx, dy));
+    cam.x = panFrom.cx - dx/cam.z;
+    cam.y = panFrom.cy - dy/cam.z;
+    draw();
+  }
+});
+function endPointer(e){
+  if(pointers.has(e.pointerId)){
+    if(pointers.size === 1 && moved < 5) pick(e.offsetX, e.offsetY);
+    pointers.delete(e.pointerId);
+  }
+  if(pointers.size < 2) pinch = null;
+  if(pointers.size === 0){ panFrom = null; cv.classList.remove('drag'); }
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', e => { pointers.delete(e.pointerId); panFrom = null; pinch = null; cv.classList.remove('drag'); });
+
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const wx = toWX(e.offsetX), wy = toWY(e.offsetY);
+  cam.z = clamp(cam.z * Math.pow(1.0016, -e.deltaY), 0.005, 60);
+  cam.x = wx - (e.offsetX - W/2)/cam.z;
+  cam.y = wy - (e.offsetY - H/2)/cam.z;
+  draw();
+}, {passive:false});
+
+cv.addEventListener('dblclick', e => {
+  const wx = toWX(e.offsetX), wy = toWY(e.offsetY);
+  flyTo(wx, wy, cam.z*2);
+});
+
+function pick(sx, sy){
+  const wx = toWX(sx), wy = toWY(sy);
+  const slop = 14/cam.z;
+  let best = null, bd = Infinity;
+  eachInRect(wx-slop, wy-slop, wx+slop, wy+slop, s => {
+    if(s.type === 'node') return;
+    const r = Math.max(s.size + slop*0.6, slop);
+    const d = (s.x-wx)*(s.x-wx) + (s.y-wy)*(s.y-wy);
+    if(d < r*r && d < bd){ bd = d; best = s; }
+  });
+  select(best ? best.id : null);
+}
+function select(id){
+  selected = id;
+  showSystem(id != null ? stars.get(id) : null);
+  draw();
+}
+
+/* ---------- system dossier ---------- */
+function showSystem(s){
+  $('#sysEmpty').style.display = s ? 'none' : '';
+  $('#sysBody').style.display = s ? '' : 'none';
+  if(!s) return;
+  openPage('sys');
+  const kind = s.type === 'blackhole' ? 'Black hole' : 'System';
+  $('#sysName').textContent = s.name || (kind + ' #' + s.id);
+  $('#sysName').style.color = s.color || 'var(--text)';
+  $('#sysKind').textContent = kind;
+  const nat = nations.get(s.nation);
+  $('#sysNation').innerHTML = (nat && nat.id)
+    ? '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
+      nat.color + ';margin-right:6px"></span>' + esc(nat.name)
+    : '<i style="font-style:normal;color:var(--dimmer)">Unclaimed</i>';
+  $('#sysPos').textContent = Math.round(s.x) + ', ' + Math.round(s.y);
+
+  const has = s.notes && s.notes.trim();
+  $('#notesGrp').style.display = has ? '' : 'none';
+  if(has) $('#sysNotes').textContent = s.notes;
+
+  const list = $('#laneList');
+  const links = [...s.links].map(id => stars.get(id)).filter(Boolean);
+  $('#laneGrp').style.display = links.length ? '' : 'none';
+  list.innerHTML = '';
+  for(const t of links){
+    /* a lane may run through path nodes — follow it to the far system */
+    const end = resolveEnd(s.id, t);
+    const row = document.createElement('div');
+    row.className = 'lane';
+    row.innerHTML = '<span style="flex:1">' + esc(end.name || 'System #' + end.id) + '</span>' +
+      '<span class="d">' + Math.round(Math.hypot(end.x-s.x, end.y-s.y)) + '</span>';
+    row.onclick = () => { select(end.id); flyTo(end.x, end.y); };
+    list.appendChild(row);
+  }
+}
+/* walk through node scaffolding so the panel lists real destinations */
+function resolveEnd(fromId, t){
+  let prev = fromId, cur = t, guard = 0;
+  while(cur.type === 'node' && guard++ < 400){
+    let nxt = null;
+    for(const id of cur.links){ if(id !== prev){ nxt = stars.get(id); break; } }
+    if(!nxt) break;
+    prev = cur.id; cur = nxt;
+  }
+  return cur;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- search ---------- */
+let index = [];
+function buildIndex(){
+  index = [];
+  for(const s of stars.values()){
+    if(s.type === 'node' || !s.name) continue;
+    index.push({id:s.id, name:s.name, low:s.name.toLowerCase(),
+      notes:!!(s.notes && s.notes.trim()), nation:s.nation});
+  }
+  index.sort((a,b) => a.name.localeCompare(b.name));
+}
+let hi = -1;
+function runSearch(){
+  const q = $('#search').value.trim().toLowerCase();
+  const box = $('#results');
+  if(!q){ box.classList.remove('on'); box.innerHTML = ''; hi = -1; return; }
+  const starts = [], contains = [];
+  for(const e of index){
+    if(e.low.startsWith(q)) starts.push(e);
+    else if(e.low.includes(q)) contains.push(e);
+    if(starts.length > 40) break;
+  }
+  const hits = starts.concat(contains).slice(0, 40);
+  box.innerHTML = '';
+  if(!hits.length){
+    box.innerHTML = '<div class="res" style="color:var(--dimmer)">No system by that name</div>';
+    box.classList.add('on'); return;
+  }
+  hits.forEach((e, i) => {
+    const nat = nations.get(e.nation);
+    const d = document.createElement('div');
+    d.className = 'res';
+    d.innerHTML = '<span class="sw" style="background:' + ((nat && nat.id) ? nat.color : '#5b6a7d') + '"></span>' +
+      '<span class="nm">' + esc(e.name) + '</span>' +
+      (e.notes ? '<span class="nt">NOTES</span>' : '');
+    d.onclick = () => goTo(e.id);
+    box.appendChild(d);
+  });
+  hi = -1;
+  box.classList.add('on');
+}
+function goTo(id){
+  const s = stars.get(id); if(!s) return;
+  select(id);
+  flyTo(s.x, s.y, Math.max(cam.z, 1.6));
+  $('#results').classList.remove('on');
+  $('#search').blur();
+}
+$('#search').addEventListener('input', runSearch);
+$('#search').addEventListener('keydown', e => {
+  const box = $('#results'), items = [...box.querySelectorAll('.res')];
+  if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+    e.preventDefault();
+    if(!items.length) return;
+    hi = clamp(hi + (e.key === 'ArrowDown' ? 1 : -1), 0, items.length-1);
+    items.forEach((it,i) => it.classList.toggle('hi', i === hi));
+    items[hi].scrollIntoView({block:'nearest'});
+  } else if(e.key === 'Enter'){
+    if(items.length) (items[hi >= 0 ? hi : 0]).click();
+  } else if(e.key === 'Escape'){
+    $('#search').value = ''; box.classList.remove('on'); $('#search').blur();
+  }
+});
+document.addEventListener('pointerdown', e => {
+  if(!$('#searchWrap').contains(e.target)) $('#results').classList.remove('on');
+}, true);
+
+/* ---------- nations ---------- */
+function buildNations(){
+  const counts = new Map();
+  for(const s of stars.values()){
+    if(s.type === 'node') continue;
+    counts.set(s.nation, (counts.get(s.nation)||0) + 1);
+  }
+  const list = $('#natList');
+  list.innerHTML = '';
+  const rows = [...nations.values()].filter(n => n.id !== 0)
+    .sort((a,b) => (counts.get(b.id)||0) - (counts.get(a.id)||0));
+  if(!rows.length){ list.innerHTML = '<div class="empty">This map has no nations.</div>'; return; }
+  for(const n of rows){
+    const row = document.createElement('div');
+    row.className = 'nat' + (n.visible ? '' : ' off');
+    const sw = document.createElement('span');
+    sw.className = 'sw'; sw.style.background = n.color;
+    sw.title = 'Show or hide this border';
+    sw.onclick = e => { e.stopPropagation(); n.visible = !n.visible; dirtyBorders(); buildNations(); draw(); };
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = n.name;
+    const cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = counts.get(n.id) || 0;
+    row.appendChild(sw); row.appendChild(nm); row.appendChild(cnt);
+    row.onclick = () => flyToNation(n.id);
+    list.appendChild(row);
+  }
+}
+function flyToNation(id){
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, any = false;
+  for(const s of stars.values()){
+    if(s.nation !== id || s.type === 'node') continue;
+    any = true;
+    if(s.x < x0) x0 = s.x; if(s.x > x1) x1 = s.x;
+    if(s.y < y0) y0 = s.y; if(s.y > y1) y1 = s.y;
+  }
+  if(!any) return;
+  const pad = opt.influence*2.2;
+  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  flyTo((x0+x1)/2, (y0+y1)/2, clamp(Math.min(W/(x1-x0), H/(y1-y0)), 0.005, 60));
+}
+
+/* ---------- view toggles ---------- */
+function tie(id, key){
+  const el = $(id);
+  el.checked = !!opt[key];
+  el.onchange = () => {
+    opt[key] = el.checked;
+    if(key === 'borders') dirtyBorders();
+    draw();
+  };
+}
+function syncView(){
+  tie('#vGlow','glow'); tie('#vLanes','lanes'); tie('#vNames','names');
+  tie('#vNat','natNames'); tie('#vBorders','borders'); tie('#vGrid','grid');
+  $('#vAnnot').checked = markAnnotated;
+}
+$('#vAnnot').onchange = e => { markAnnotated = e.target.checked; draw(); };
+
+/* ---------- panel ---------- */
+function openPage(p){
+  document.querySelectorAll('#ptabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === p));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === 'pg-' + p));
+  $('#panel').classList.remove('hide');
+  $('#ptab').textContent = '›';
+}
+document.querySelectorAll('#ptabs button').forEach(b => b.onclick = () => openPage(b.dataset.p));
+$('#ptab').onclick = () => {
+  const p = $('#panel'); p.classList.toggle('hide');
+  $('#ptab').textContent = p.classList.contains('hide') ? '‹' : '›';
+};
+$('#bFit').onclick = fitAll;
+$('#bIn').onclick = () => flyTo(cam.x, cam.y, cam.z*1.6);
+$('#bOut').onclick = () => flyTo(cam.x, cam.y, cam.z/1.6);
+
+addEventListener('keydown', e => {
+  if(/^(input|textarea)$/i.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if(k === 'f') fitAll();
+  else if(k === 'g'){ opt.glow = !opt.glow; syncView(); draw(); }
+  else if(k === 'escape'){ select(null); }
+  else if(k === '/'){ e.preventDefault(); $('#search').focus(); }
+});
+
+/* ---------- file input ---------- */
+let toastT = null;
+function toast(m){
+  const t = $('#toast'); t.textContent = m; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2100);
+}
+function readFile(f){
+  const fr = new FileReader();
+  fr.onload = () => {
+    try { loadMap(JSON.parse(fr.result), f.name.replace(/\.json$/i,'')); toast('Map loaded'); }
+    catch(err){ toast("That doesn't look like an Aster map."); }
+  };
+  fr.readAsText(f);
+}
+$('#fileMap').onchange = e => { const f = e.target.files[0]; if(f) readFile(f); };
+const chooser = () => { $('#fileMap').value = ''; $('#fileMap').click(); };
+$('#bOpen').onclick = chooser;
+$('#bOpen2').onclick = chooser;
+$('#bChoose').onclick = chooser;
+
+addEventListener('dragover', e => { e.preventDefault(); $('#drop').classList.add('on'); });
+addEventListener('dragleave', e => { if(e.clientX === 0 && e.clientY === 0) hideDropIfLoaded(); });
+addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if(f) readFile(f); else hideDropIfLoaded();
+});
+function hideDropIfLoaded(){ if(stars.size) $('#drop').classList.remove('on'); }
+
+/* ---------- boot ---------- */
+resize();
+(async function boot(){
+  const url = new URLSearchParams(location.search).get('map');
+  const tryLoad = async (src, label) => {
+    const r = await fetch(src, {cache:'no-cache'});
+    if(!r.ok) throw new Error(r.status);
+    loadMap(await r.json(), label);
+    return true;
+  };
+  try {
+    if(url){ await tryLoad(url, url.split('/').pop().replace(/\.json$/i,'')); return; }
+  } catch(err){
+    $('#dropMsg').textContent = 'Could not load ' + url + '. Choose a map file instead.';
+    $('#drop').classList.add('on'); return;
+  }
+  try {
+    const raw = ($('#embedded-map').textContent || '').trim();
+    if(raw && raw !== 'null'){ loadMap(JSON.parse(raw), 'Embedded map'); return; }
+  } catch(err){ /* fall through to the default file */ }
+  try { await tryLoad(DEFAULT_MAP, DEFAULT_MAP.replace(/\.json$/i,'')); return; }
+  catch(err){
+    $('#dropMsg').innerHTML = location.protocol === 'file:'
+      ? 'Opened straight from disk, so the browser blocks reading <b>' + DEFAULT_MAP +
+        '</b>. Host these files on a web server, or just choose a map below.'
+      : 'No <b>' + DEFAULT_MAP + '</b> found alongside this page. Drop a map file here, or choose one.';
+    $('#drop').classList.add('on');
+  }
+})();
+
+
+/* ==== rendering core, lifted verbatim from the Aster editor ==== */
+const glowCache = new Map();
+const MS = [
+  null, [[3,0]], [[0,1]], [[3,1]], [[1,2]], [[3,0],[1,2]], [[0,2]], [[3,2]],
+  [[2,3]], [[2,0]], [[0,1],[2,3]], [[2,1]], [[1,3]], [[1,0]], [[0,3]], null
+];
+const FONTS = {
+  cond:'"IBM Plex Sans Condensed", system-ui, sans-serif',
+  mono:'"IBM Plex Mono", ui-monospace, monospace',
+  serif:'Georgia, "Times New Roman", serif'
+};
+const fontStr = (t, size) =>
+  (t.italic ? 'italic ' : '') + t.weight + ' ' + size + 'px ' + FONTS[t.font];
+
+function rgba(hex, a){
+  const h = hex.replace('#','');
+  const n = parseInt(h.length === 3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  return 'rgba(' + ((n>>16)&255) + ',' + ((n>>8)&255) + ',' + (n&255) + ',' + a + ')';
+}
+
+function glowSprite(color){
+  let c = glowCache.get(color);
+  if(c) return c;
+  const S = 128;
+  c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+  gr.addColorStop(0,    rgba(color, 0.90));
+  gr.addColorStop(0.10, rgba(color, 0.52));
+  gr.addColorStop(0.28, rgba(color, 0.17));
+  gr.addColorStop(0.60, rgba(color, 0.035));
+  gr.addColorStop(1,    rgba(color, 0));
+  g.fillStyle = gr; g.fillRect(0,0,S,S);
+  if(glowCache.size > 80) glowCache.clear();
+  glowCache.set(color, c);
+  return c;
+}
+
+function drawTexts(g, c, vw, vh, clip){
+  const SX = wx => (wx - c.x)*c.z + vw/2;
+  const SY = wy => (wy - c.y)*c.z + vh/2;
+  const had = ('letterSpacing' in g);
+  for(const t of texts.values()){
+    const fs = t.size * c.z;
+    if(fs < 3 || !t.text) continue;
+    const px = SX(t.x), py = SY(t.y);
+    const reach = Math.max(fs * String(t.text).length * 0.9, fs*3);
+    if(px < clip.x0 - reach || px > clip.x1 + reach ||
+       py < clip.y0 - reach || py > clip.y1 + reach) continue;
+    const lines = String(t.text).split('\n');
+    g.save();
+    g.translate(px, py);
+    if(t.rot) g.rotate(t.rot*Math.PI/180);
+    if(had) g.letterSpacing = (fs*t.spacing).toFixed(2) + 'px';
+    g.font = fontStr(t, fs.toFixed(1));
+    g.textAlign = t.align; g.textBaseline = 'middle';
+    g.globalAlpha = t.opacity;
+    const lh = fs*1.25, y0 = -(lines.length-1)*lh/2;
+    if(t.halo){
+      g.lineJoin = 'round'; g.miterLimit = 2;
+      g.lineWidth = Math.max(1, fs*0.14);
+      g.strokeStyle = 'rgba(0,0,0,.8)';
+      for(let i=0;i<lines.length;i++) g.strokeText(lines[i], 0, y0 + i*lh);
+    }
+    g.fillStyle = t.color;
+    for(let i=0;i<lines.length;i++) g.fillText(lines[i], 0, y0 + i*lh);
+    g.globalAlpha = 1;
+    if(had) g.letterSpacing = '0px';
+    g.restore();
+  }
+  if(had) g.letterSpacing = '0px';
+}
+
+function drawLayer(g, L, c, vw, vh){
+  if(!L.img || !L.visible || L.opacity <= 0) return;
+  const w = L.img.width * L.scale * c.z, h = L.img.height * L.scale * c.z;
+  const px = (L.x - c.x)*c.z + vw/2, py = (L.y - c.y)*c.z + vh/2;
+  g.globalAlpha = L.opacity;
+  g.drawImage(L.img, px - w/2, py - h/2, w, h);
+  g.globalAlpha = 1;
+}
+
+function drawGrid(g, c, vw, vh, wx0, wy0, wx1, wy1){
+  let step = 100;
+  while(step*c.z < 48) step *= 5;
+  while(step*c.z > 320) step /= 5;
+  g.strokeStyle = 'rgba(120,150,180,.075)'; g.lineWidth = 1;
+  g.beginPath();
+  for(let x = Math.floor(wx0/step)*step; x < wx1; x += step){
+    const sx = Math.round((x - c.x)*c.z + vw/2) + 0.5;
+    g.moveTo(sx, 0); g.lineTo(sx, vh);
+  }
+  for(let y = Math.floor(wy0/step)*step; y < wy1; y += step){
+    const sy = Math.round((y - c.y)*c.z + vh/2) + 0.5;
+    g.moveTo(0, sy); g.lineTo(vw, sy);
+  }
+  g.stroke();
+}
+
+function drawScene(g, c, vw, vh, clip, o){
+  const transparent = !!o.transparent;
+  g.save();
+  g.translate(-clip.x0, -clip.y0);
+  g.beginPath(); g.rect(clip.x0, clip.y0, clip.x1-clip.x0, clip.y1-clip.y0); g.clip();
+
+  if(transparent) g.clearRect(clip.x0, clip.y0, clip.x1-clip.x0, clip.y1-clip.y0);
+  else { g.fillStyle = opt.bg; g.fillRect(clip.x0, clip.y0, clip.x1-clip.x0, clip.y1-clip.y0); }
+
+  const wx0 = (clip.x0 - vw/2)/c.z + c.x, wx1 = (clip.x1 - vw/2)/c.z + c.x;
+  const wy0 = (clip.y0 - vh/2)/c.z + c.y, wy1 = (clip.y1 - vh/2)/c.z + c.y;
+  const SX = wx => (wx - c.x)*c.z + vw/2;
+  const SY = wy => (wy - c.y)*c.z + vh/2;
+
+  drawLayer(g, layers.under, c, vw, vh);
+  if(opt.grid) drawGrid(g, c, vw, vh, wx0, wy0, wx1, wy1);
+
+  /* --- borders --- */
+  if(opt.borders && borderCache.length){
+    for(const b of borderCache){
+      g.beginPath();
+      for(const loop of b.loops){
+        g.moveTo(SX(loop[0]), SY(loop[1]));
+        for(let i=2;i<loop.length;i+=2) g.lineTo(SX(loop[i]), SY(loop[i+1]));
+        g.closePath();
+      }
+      g.fillStyle = rgba(b.color, opt.fillAlpha/100);
+      g.fill('evenodd');
+      g.lineJoin = 'round';
+      g.strokeStyle = rgba(b.color, 0.18);
+      g.lineWidth = Math.max(3, 7*c.z*0.4);
+      g.stroke();
+      g.strokeStyle = rgba(b.color, 0.92);
+      g.lineWidth = Math.max(1, 1.6*Math.min(2, c.z));
+      g.stroke();
+    }
+  }
+
+  /* --- lanes (culled with margin for long links) --- */
+  if(opt.lanes && lanes.size){
+    const M = 900;
+    g.beginPath();
+    const seen = new Set();
+    eachInRect(wx0-M, wy0-M, wx1+M, wy1+M, s => {
+      for(const oid of s.links){
+        if(oid < s.id) continue;
+        const t = stars.get(oid); if(!t) continue;
+        const k = s.id + '|' + oid;
+        if(seen.has(k)) continue; seen.add(k);
+        g.moveTo(SX(s.x), SY(s.y)); g.lineTo(SX(t.x), SY(t.y));
+      }
+    });
+    g.strokeStyle = rgba(opt.lane, 0.62);
+    g.lineWidth = Math.max(0.35, opt.laneW * Math.min(2.5, c.z));
+    g.stroke();
+  }
+
+  /* --- free text labels: above the lanes, beneath the stars --- */
+  if(texts.size) drawTexts(g, c, vw, vh, clip);
+
+  /* --- collect visible stars once --- */
+  const vis = [];
+  const gpad = 60/c.z;
+  eachInRect(wx0-gpad, wy0-gpad, wx1+gpad, wy1+gpad, s => vis.push(s));
+
+  /* --- glow pass --- */
+  if(opt.glow){
+    g.globalCompositeOperation = 'lighter';
+    for(const s of vis){
+      if(s.type === 'node') continue;
+      const r = Math.max(0.6, s.size*c.z);
+      const gr = s.type === 'blackhole' ? r*7.5 : r*5.5;
+      if(gr < 1.2) continue;
+      const col = s.type === 'blackhole' ? (s.color === '#dfe9f7' ? '#ffb35c' : s.color) : s.color;
+      g.globalAlpha = s.type === 'blackhole' ? 0.95 : 0.72;
+      g.drawImage(glowSprite(col), SX(s.x)-gr, SY(s.y)-gr, gr*2, gr*2);
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  /* --- core pass, batched by colour --- */
+  const batches = new Map();
+  const holes = [];
+  const nodeMarks = [];
+  for(const s of vis){
+    if(s.type === 'node'){ nodeMarks.push(s); continue; }
+    if(s.type === 'blackhole'){ holes.push(s); continue; }
+    let b = batches.get(s.color); if(!b){ b = []; batches.set(s.color, b); }
+    b.push(s);
+  }
+  for(const [col, arr] of batches){
+    g.fillStyle = col; g.beginPath();
+    for(const s of arr){
+      const r = s.size*c.z;
+      const px = SX(s.x), py = SY(s.y);
+      if(r < 0.85){ g.rect(px-0.5, py-0.5, 1.2, 1.2); }
+      else { g.moveTo(px+r, py); g.arc(px, py, r, 0, 6.2832); }
+    }
+    g.fill();
+  }
+  /* path node markers — an editing affordance, deliberately never exported */
+  if(nodeMarks.length && opt.showNodes && !o.forExport){
+    g.strokeStyle = rgba(opt.lane, 0.85);
+    g.lineWidth = 1;
+    g.beginPath();
+    for(const s of nodeMarks){
+      const px = SX(s.x), py = SY(s.y);
+      const r = Math.max(2.2, Math.min(5, 3*c.z));
+      g.moveTo(px, py-r); g.lineTo(px+r, py); g.lineTo(px, py+r); g.lineTo(px-r, py); g.closePath();
+    }
+    g.stroke();
+  }
+  for(const s of holes){
+    const r = Math.max(2, s.size*c.z*1.5);
+    const px = SX(s.x), py = SY(s.y);
+    const ring = s.color === '#dfe9f7' ? '#ffb35c' : s.color;
+    g.beginPath(); g.arc(px, py, r, 0, 6.2832);
+    g.fillStyle = '#000'; g.fill();
+    g.strokeStyle = ring; g.lineWidth = Math.max(1, r*0.16); g.stroke();
+  }
+
+  /* --- nation names, scaled to territory --- */
+  if(opt.natNames && nationLabels.length){
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for(const L of nationLabels){
+      const nat = nations.get(L.nation);
+      if(!nat || !nat.visible) continue;
+      const px0 = SX(L.x), py0 = SY(L.y);
+      if(px0 < clip.x0-500 || px0 > clip.x1+500 || py0 < clip.y0-300 || py0 > clip.y1+300) continue;
+      let px = Math.min(L.w * c.z * 0.13, 88) * opt.natNameScale;
+      const minPx = 7 * opt.natNameScale;
+      if(px < minPx) continue;
+      const txt = (nat.name || '').toUpperCase();
+      if(!txt) continue;
+      const setFont = size => {
+        if('letterSpacing' in g) g.letterSpacing = (size*0.16).toFixed(2) + 'px';
+        g.font = '600 ' + size.toFixed(1) + 'px "IBM Plex Sans Condensed", system-ui, sans-serif';
+      };
+      const maxW = L.w * c.z * 0.78;
+      const maxH = L.h * c.z * 0.80;
+      const words = txt.split(/\s+/).filter(Boolean);
+
+      /* greedy wrap at a given size; returns the lines and the widest of them */
+      const wrapAt = size => {
+        setFont(size);
+        const lines = [];
+        let cur = '';
+        for(const w of words){
+          const test = cur ? cur + ' ' + w : w;
+          if(cur && g.measureText(test).width > maxW){ lines.push(cur); cur = w; }
+          else cur = test;
+        }
+        if(cur) lines.push(cur);
+        let widest = 0;
+        for(const l of lines) widest = Math.max(widest, g.measureText(l).width);
+        return {lines, widest};
+      };
+      const widestOf = (lines, size) => {
+        setFont(size);
+        let widest = 0;
+        for(const l of lines) widest = Math.max(widest, g.measureText(l).width);
+        return widest;
+      };
+
+      /* Line breaks are decided at the UNCAPPED reference size, not the drawn
+         size. Both the reference size and maxW scale with c.z, so the ratio
+         between them — and therefore where the text breaks — is identical at
+         every zoom and at every export resolution. Deciding breaks at the
+         drawn size instead would let the 88px cap suppress wrapping whenever
+         c.z is high, which is exactly what happens during an 8K export. */
+      const refPx = L.w * c.z * 0.13 * opt.natNameScale;
+      let wrapped = wrapAt(refPx);
+
+      /* a single unbreakable word can still overrun at the drawn size */
+      let widest = widestOf(wrapped.lines, px);
+      if(widest > maxW){
+        const shrunk = px * (maxW / widest);
+        if(shrunk < minPx){ if('letterSpacing' in g) g.letterSpacing = '0px'; continue; }
+        px = shrunk;
+      }
+      /* and a tall stack can overrun a wide, shallow territory */
+      let lh = px * 1.12;
+      if(maxH > 0 && wrapped.lines.length * lh > maxH){
+        const shrunk = px * (maxH / (wrapped.lines.length * lh));
+        if(shrunk < minPx){ if('letterSpacing' in g) g.letterSpacing = '0px'; continue; }
+        px = shrunk;
+        lh = px * 1.12;
+      }
+      /* export-only trim, applied after wrapping so line breaks match the preview */
+      if(o.forExport && opt.natNameExport !== 1){
+        px *= opt.natNameExport;
+        lh = px * 1.12;
+      }
+      setFont(px);
+
+      g.lineJoin = 'round';
+      g.miterLimit = 2;
+      g.lineWidth = Math.max(1, px * 0.16);
+      g.strokeStyle = 'rgba(0,0,0,.85)';
+      const fill = rgba(nat.color, 0.85);
+      const top = py0 - (wrapped.lines.length - 1) * lh / 2;
+      for(let i=0;i<wrapped.lines.length;i++){
+        const ln = wrapped.lines[i], ly = top + i*lh;
+        g.strokeText(ln, px0, ly);
+      }
+      g.fillStyle = fill;
+      for(let i=0;i<wrapped.lines.length;i++){
+        g.fillText(wrapped.lines[i], px0, top + i*lh);
+      }
+    }
+    if('letterSpacing' in g) g.letterSpacing = '0px';
+    g.shadowBlur = 0;
+  }
+
+  /* --- names --- */
+  if(opt.names && c.z > 0.32){
+    const nameFs = Math.min(15, Math.max(9, 10*Math.min(1.6, c.z)));
+    g.font = '500 ' + nameFs + 'px "IBM Plex Mono", monospace';
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    /* Two passes: every outline first, then every fill. The stroke colour is
+       constant while the fill changes per nation, so batching this way avoids
+       a style switch per star — and it stops one star's outline from cutting
+       into a neighbour's glyphs where labels crowd together. */
+    const named = [];
+    for(const s of vis){
+      if(!s.name || s.type === 'node') continue;
+      named.push(s);
+    }
+    if(named.length){
+      g.lineJoin = 'round';
+      g.miterLimit = 2;
+      g.lineWidth = Math.max(1, nameFs * 0.16);
+      g.strokeStyle = 'rgba(0,0,0,.85)';
+      for(const s of named)
+        g.strokeText(s.name, SX(s.x), SY(s.y) + Math.max(4, s.size*c.z) + 3);
+      for(const s of named){
+        const nat = nations.get(s.nation);
+        g.fillStyle = (nat && nat.id) ? rgba(nat.color, 0.95) : 'rgba(190,205,222,.82)';
+        g.fillText(s.name, SX(s.x), SY(s.y) + Math.max(4, s.size*c.z) + 3);
+      }
+    }
+  }
+
+  drawLayer(g, layers.over, c, vw, vh);
+  g.restore();
+}
+
+function computeBordersInner(){
+  bordersDirty = false; borderCache = [];
+  if(!opt.borders || !stars.size) return;
+  let any = false;
+  for(const s of stars.values()) if(s.nation && nations.get(s.nation) && nations.get(s.nation).visible){ any = true; break; }
+  if(!any) return;
+
+  const R = opt.influence;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for(const s of stars.values()){
+    if(s.x < x0) x0 = s.x; if(s.x > x1) x1 = s.x;
+    if(s.y < y0) y0 = s.y; if(s.y > y1) y1 = s.y;
+  }
+  const pad = R * 1.6;
+  x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+  const wWorld = x1 - x0, hWorld = y1 - y0;
+  const res = Math.max(R/9, Math.max(wWorld, hWorld) / 760);
+  const gw = Math.ceil(wWorld/res) + 1, gh = Math.ceil(hWorld/res) + 1;
+  const owner = new Int16Array(gw*gh).fill(-1);
+  const dist  = new Float32Array(gw*gh).fill(Infinity);
+  const bb = new Map();                       // nationId -> [i0,j0,i1,j1]
+  const cellR = Math.ceil(R/res);
+
+  for(const s of stars.values()){
+    if(s.type === 'node') continue;   /* scaffolding, not a system: claims nothing */
+    const ci = Math.round((s.x - x0)/res), cj = Math.round((s.y - y0)/res);
+    const nid = s.nation | 0;
+    for(let j = Math.max(0, cj-cellR); j <= Math.min(gh-1, cj+cellR); j++){
+      const dy = (y0 + j*res) - s.y;
+      for(let i = Math.max(0, ci-cellR); i <= Math.min(gw-1, ci+cellR); i++){
+        const dx = (x0 + i*res) - s.x;
+        const d2 = dx*dx + dy*dy;
+        if(d2 > R*R) continue;
+        const k = j*gw + i;
+        if(d2 < dist[k]){ dist[k] = d2; owner[k] = nid; }
+      }
+    }
+    if(nid){
+      let b = bb.get(nid);
+      const i0 = Math.max(0, ci-cellR-1), j0 = Math.max(0, cj-cellR-1);
+      const i1 = Math.min(gw-1, ci+cellR+1), j1 = Math.min(gh-1, cj+cellR+1);
+      if(!b) bb.set(nid, [i0,j0,i1,j1]);
+      else { b[0]=Math.min(b[0],i0); b[1]=Math.min(b[1],j0); b[2]=Math.max(b[2],i1); b[3]=Math.max(b[3],j1); }
+    }
+  }
+
+  for(const [nid, box] of bb){
+    const nat = nations.get(nid);
+    if(!nat || !nat.visible) continue;
+    const loops = march(owner, gw, gh, nid, box, x0, y0, res);
+    if(loops.length) borderCache.push({nation:nid, color:nat.color, loops});
+  }
+}
+
+function march(owner, gw, gh, nid, box, ox, oy, res){
+  const i0 = box[0]-1, j0 = box[1]-1, i1 = box[2]+1, j1 = box[3]+1;
+  const inside = (i,j) => (i<0||j<0||i>=gw||j>=gh) ? 0 : (owner[j*gw+i] === nid ? 1 : 0);
+  const segs = new Map();
+  const key = (a,b) => a + ',' + b;
+  for(let j=j0; j<j1; j++) for(let i=i0; i<i1; i++){
+    const c = inside(i,j) | (inside(i+1,j)<<1) | (inside(i+1,j+1)<<2) | (inside(i,j+1)<<3);
+    const t = MS[c]; if(!t) continue;
+    const P = [[2*i+1, 2*j], [2*i+2, 2*j+1], [2*i+1, 2*j+2], [2*i, 2*j+1]];
+    for(const s of t){
+      const A = P[s[0]], B = P[s[1]];
+      segs.set(key(A[0],A[1]), [A[0],A[1],B[0],B[1]]);
+    }
+  }
+  const loops = [];
+  const used = new Set();
+  for(const [k0, s0] of segs){
+    if(used.has(k0)) continue;
+    const pts = [];
+    let k = k0, guard = 0;
+    while(guard++ < 400000){
+      const s = segs.get(k);
+      if(!s || used.has(k)) break;
+      used.add(k);
+      pts.push(ox + s[0]*0.5*res, oy + s[1]*0.5*res);
+      k = key(s[2], s[3]);
+      if(k === k0) break;
+    }
+    if(pts.length >= 8) loops.push(chaikin(pts, opt.smooth));
+  }
+  return loops;
+}
+
+function chaikin(pts, iters){
+  let p = pts;
+  for(let it=0; it<iters; it++){
+    const n = p.length/2;
+    if(n < 4) break;
+    const out = new Array(n*4);
+    for(let i=0;i<n;i++){
+      const j = (i+1)%n;
+      const ax = p[i*2], ay = p[i*2+1], bx = p[j*2], by = p[j*2+1];
+      out[i*4]   = ax + (bx-ax)*0.25; out[i*4+1] = ay + (by-ay)*0.25;
+      out[i*4+2] = ax + (bx-ax)*0.75; out[i*4+3] = ay + (by-ay)*0.75;
+    }
+    p = out;
+  }
+  return p;
+}
+
+function polyArea(p){
+  let a = 0;
+  for(let i=0, n=p.length/2; i<n; i++){
+    const j = (i+1)%n;
+    a += p[i*2]*p[j*2+1] - p[j*2]*p[i*2+1];
+  }
+  return a/2;
+}
+
+function polyCentroid(p){
+  let a = 0, cx = 0, cy = 0;
+  for(let i=0, n=p.length/2; i<n; i++){
+    const j = (i+1)%n;
+    const f = p[i*2]*p[j*2+1] - p[j*2]*p[i*2+1];
+    a += f; cx += (p[i*2]+p[j*2])*f; cy += (p[i*2+1]+p[j*2+1])*f;
+  }
+  if(Math.abs(a) < 1e-6) return {x:p[0], y:p[1]};
+  a *= 3;
+  return {x:cx/a, y:cy/a};
+}
+
+function computeLabels(){
+  nationLabels = [];
+  const agg = new Map();
+  for(const s of stars.values()){
+    if(!s.nation) continue;
+    const nat = nations.get(s.nation);
+    if(!nat || !nat.visible) continue;
+    let a = agg.get(s.nation);
+    if(!a){ a = {sx:0, sy:0, n:0, x0:Infinity, y0:Infinity, x1:-Infinity, y1:-Infinity}; agg.set(s.nation, a); }
+    a.sx += s.x; a.sy += s.y; a.n++;
+    if(s.x < a.x0) a.x0 = s.x; if(s.x > a.x1) a.x1 = s.x;
+    if(s.y < a.y0) a.y0 = s.y; if(s.y > a.y1) a.y1 = s.y;
+  }
+  /* prefer the centroid of the nation's largest contiguous region — a star
+     average lands outside the territory when a nation is a crescent or ring */
+  const anchor = new Map();
+  for(const b of borderCache){
+    let best = null, bestA = 0;
+    for(const loop of b.loops){
+      const a = Math.abs(polyArea(loop));
+      if(a > bestA){ bestA = a; best = loop; }
+    }
+    if(best) anchor.set(b.nation, polyCentroid(best));
+  }
+  for(const [nid, a] of agg){
+    const c = anchor.get(nid);
+    nationLabels.push({
+      nation: nid,
+      x: c ? c.x : a.sx/a.n,
+      y: c ? c.y : a.sy/a.n,
+      w: Math.max(a.x1-a.x0, 30) + opt.influence*2,
+      h: Math.max(a.y1-a.y0, 30) + opt.influence*2
+    });
+  }
+}
+
+</script>
+</body>
+</html>
