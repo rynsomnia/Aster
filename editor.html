@@ -2239,7 +2239,16 @@ function stellarisLanes(){
 
 const pdxEsc = t => String(t).replace(/"/g, "'").replace(/[\r\n\t]+/g, ' ').trim();
 
-function buildStellaris(cfg){
+const STELLARIS_DEFAULTS = {
+  name:'Aster Galaxy', priority:10, shape:'elliptical', radius:500,
+  empMin:4, empMax:20, empDef:10, fallenDef:2, fallenMax:4,
+  marauderDef:1, marauderMax:1, nomadDef:1, nomadMax:1, advDef:1,
+  wormholes:1, gateways:1, bhInit:'', names:true, flipY:true, spawnAll:true
+};
+function buildStellaris(cfgIn){
+  /* every field defaulted — a stray undefined would be written straight into
+     the file and the game's parser would choke on it */
+  const cfg = Object.assign({}, STELLARIS_DEFAULTS, cfgIn || {});
   const real = [];
   for(const s of stars.values()) if(s.type !== 'node') real.push(s);
   if(!real.length) return null;
@@ -2265,15 +2274,21 @@ function buildStellaris(cfg){
   L.push('static_galaxy_scenario = {');
   L.push('\tname = "' + pdxEsc(cfg.name) + '"');
   L.push('\tpriority = ' + cfg.priority);
+  if(cfg.shape) L.push('\tsupports_shape = ' + cfg.shape);
   L.push('\tradius = ' + cfg.radius);
   L.push('\tnum_empires = { min = ' + cfg.empMin + ' max = ' + cfg.empMax + ' }');
   L.push('\tnum_empire_default = ' + cfg.empDef);
   L.push('\tfallen_empire_default = ' + cfg.fallenDef);
   L.push('\tfallen_empire_max = ' + cfg.fallenMax);
+  L.push('\tmarauder_empire_default = ' + cfg.marauderDef);
+  L.push('\tmarauder_empire_max = ' + cfg.marauderMax);
+  L.push('\tnomad_empire_default = ' + cfg.nomadDef);
+  L.push('\tnomad_empire_max = ' + cfg.nomadMax);
   L.push('\tadvanced_empire_default = ' + cfg.advDef);
   L.push('\tcolonizable_planet_odds = 1.0');
   L.push('\tprimitive_odds = 1.0');
   L.push('\tcrisis_strength = 0.75');
+  L.push('\textra_crisis_strength = { 5.5 6 6.5 7 7.5 8 8.5 9 9.5 10 11 12 13 14 15 17.5 20 22.5 25 30 35 40 45 50 }');
   L.push('\tnum_wormhole_pairs = { min = 0 max = ' + cfg.wormholes + ' }');
   L.push('\tnum_wormhole_pairs_default = ' + Math.min(1, cfg.wormholes));
   L.push('\tnum_gateways = { min = 0 max = ' + cfg.gateways + ' }');
@@ -2293,6 +2308,10 @@ function buildStellaris(cfg){
     let line = '\tsystem = { id = "' + idx.get(s.id) + '" name = "' + nm + '"' +
                ' position = { x = ' + px + ' y = ' + py + ' }';
     if(s.type === 'blackhole' && cfg.bhInit) line += ' initializer = ' + cfg.bhInit;
+    /* Without a spawn_weight anywhere, the game has no candidates to seat
+       empires in. Aster has no notion of a designated homeworld, so the
+       honest default is to make every ordinary system eligible. */
+    if(cfg.spawnAll && s.type !== 'blackhole') line += ' spawn_weight = { base = 1 }';
     L.push(line + ' }');
   }
   L.push('');
@@ -2318,6 +2337,13 @@ function stellarisDialog(){
     '<div class="row"><label>Preset name</label><input type="text" id="sName" value="Aster Galaxy"></div>' +
     '<div class="row"><label>Radius</label><input type="range" id="sRadius" min="100" max="500" step="10" value="500" style="flex:1"><span class="val" id="sRadiusV">500</span></div>' +
     '<div class="row"><label>Priority</label><input type="number" id="sPrio" value="10" min="0"></div>' +
+    '<div class="row"><label>Shape</label><select id="sShape">' +
+      '<option value="elliptical">elliptical</option>' +
+      '<option value="spiral_2">spiral_2</option>' +
+      '<option value="spiral_4">spiral_4</option>' +
+      '<option value="ring">ring</option>' +
+      '<option value="">omit the field</option>' +
+    '</select></div>' +
     '<div class="cols">' +
       '<div class="row"><label style="width:auto">Empires min</label><input type="number" id="sEmpMin" value="4" min="1"></div>' +
       '<div class="row"><label style="width:auto">max</label><input type="number" id="sEmpMax" value="20" min="1"></div>' +
@@ -2328,10 +2354,19 @@ function stellarisDialog(){
       '<div class="row"><label style="width:auto">max</label><input type="number" id="sFallenMax" value="4" min="0" max="5"></div>' +
     '</div>' +
     '<div class="cols">' +
+      '<div class="row"><label style="width:auto">Marauder def</label><input type="number" id="sMarDef" value="1" min="0"></div>' +
+      '<div class="row"><label style="width:auto">max</label><input type="number" id="sMarMax" value="1" min="0"></div>' +
+    '</div>' +
+    '<div class="cols">' +
+      '<div class="row"><label style="width:auto">Nomad def</label><input type="number" id="sNomDef" value="1" min="0"></div>' +
+      '<div class="row"><label style="width:auto">max</label><input type="number" id="sNomMax" value="1" min="0"></div>' +
+    '</div>' +
+    '<div class="cols">' +
       '<div class="row"><label style="width:auto">Wormholes</label><input type="number" id="sWorm" value="1" min="0"></div>' +
       '<div class="row"><label style="width:auto">Gateways</label><input type="number" id="sGate" value="1" min="0"></div>' +
     '</div>' +
     '<div class="row"><label>Black hole</label><input type="text" id="sBhInit" placeholder="initializer name — blank lets the game choose"></div>' +
+    '<label class="check"><input type="checkbox" id="sSpawn" checked> Let empires spawn in any system</label>' +
     '<label class="check"><input type="checkbox" id="sNames" checked> Use my system names</label>' +
     '<label class="check"><input type="checkbox" id="sFlipY" checked> Flip Y axis</label>' +
     '<p class="hint" id="sInfo"></p>' +
@@ -2343,7 +2378,10 @@ function stellarisDialog(){
     let msg = real.toLocaleString() + ' systems will be written. ';
     if(real > 1000) msg += 'Base Stellaris tops out near 1000 — this needs a large-galaxy mod to load.';
     else msg += 'Path nodes are collapsed into single hyperlanes.';
-    $('#sInfo').innerHTML = msg + '<br>If the galaxy comes out mirrored in game, re-export with Flip Y off.';
+    $('#sInfo').innerHTML = msg +
+      '<br>Aster has no designated homeworlds, so empire spawns are opened to every system. ' +
+      'Untick that to hand-place <i>spawn_weight</i> yourself.' +
+      '<br>If the galaxy comes out mirrored in game, re-export with Flip Y off.';
   };
   $('#sRadius').oninput = info; info();
   $('#sCancel').onclick = closeModal;
@@ -2360,6 +2398,12 @@ function stellarisDialog(){
       advDef:1,
       wormholes:Math.max(0, +$('#sWorm').value || 0),
       gateways:Math.max(0, +$('#sGate').value || 0),
+      shape:$('#sShape').value,
+      marauderDef:Math.max(0, +$('#sMarDef').value || 0),
+      marauderMax:Math.max(0, +$('#sMarMax').value || 0),
+      nomadDef:Math.max(0, +$('#sNomDef').value || 0),
+      nomadMax:Math.max(0, +$('#sNomMax').value || 0),
+      spawnAll:$('#sSpawn').checked,
       bhInit:$('#sBhInit').value.trim(),
       names:$('#sNames').checked,
       flipY:$('#sFlipY').checked
