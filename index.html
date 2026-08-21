@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aster Galaxy Tool</title>
+<meta name="description" content="Manual galaxy and starmap cartography.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='9' fill='none' stroke='%23e8a13c' stroke-width='2.5'/><circle cx='16' cy='16' r='6' fill='%23000'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#05070b; --chrome:#0c1016; --chrome-2:#11161f; --raise:#161d27;
+  --line:#212a36; --line-hot:#2f3b4b; --text:#c4cede; --dim:#69788c;
+  --dimmer:#47535f; --amber:#e8a13c; --amber-soft:#f0c07a; --teal:#4c8f9b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--void);color:var(--text);
+  font-family:"IBM Plex Sans Condensed",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  overflow:hidden}
+#sky{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+
+/* the accretion ring sitting behind everything, echoing the map's core marker */
+#core{position:fixed;left:50%;top:50%;width:min(74vmin,620px);height:min(74vmin,620px);
+  transform:translate(-50%,-50%);z-index:1;pointer-events:none;
+  background:radial-gradient(circle,
+    rgba(232,161,60,.13) 0%, rgba(232,161,60,.06) 22%,
+    rgba(232,161,60,.018) 46%, transparent 70%);
+  animation:breathe 11s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.85;transform:translate(-50%,-50%) scale(1)}
+  50%{opacity:1;transform:translate(-50%,-50%) scale(1.045)}}
+
+#wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:32px 20px;gap:0}
+
+header{text-align:center;margin-bottom:54px}
+.mark{width:38px;height:38px;margin:0 auto 20px;display:block}
+.mark circle.ring{fill:none;stroke:var(--amber);stroke-width:2.4}
+.mark circle.hole{fill:var(--void)}
+h1{font:600 clamp(19px,3.4vw,30px)/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.34em;text-transform:uppercase;color:var(--amber);
+  margin:0 0 16px;padding-left:.34em}
+.rule{width:170px;height:1px;margin:0 auto 15px;
+  background:linear-gradient(90deg,transparent,var(--line-hot) 22%,var(--amber) 50%,var(--line-hot) 78%,transparent)}
+.tagline{font:400 12px/1.6 "IBM Plex Mono";letter-spacing:.15em;text-transform:uppercase;
+  color:var(--dimmer);margin:0}
+
+#choices{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;width:100%;max-width:660px}
+.choice{flex:1 1 270px;max-width:315px;position:relative;display:block;text-decoration:none;
+  color:inherit;background:linear-gradient(165deg,rgba(22,29,39,.82),rgba(12,16,22,.82));
+  border:1px solid var(--line);border-radius:4px;padding:28px 24px 24px;
+  backdrop-filter:blur(3px);transition:border-color .2s,transform .2s,background .2s;
+  overflow:hidden}
+.choice::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--line-hot),transparent);transition:background .2s}
+.choice:hover,.choice:focus-visible{border-color:var(--line-hot);transform:translateY(-3px);
+  background:linear-gradient(165deg,rgba(28,36,48,.9),rgba(14,19,26,.9));outline:none}
+.choice:hover::before,.choice:focus-visible::before{
+  background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+.choice:active{transform:translateY(-1px)}
+.glyph{width:32px;height:32px;margin-bottom:18px;fill:none;stroke:var(--dim);
+  stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+.choice:hover .glyph,.choice:focus-visible .glyph{stroke:var(--amber)}
+.kicker{font:500 9px/1 "IBM Plex Mono";letter-spacing:.19em;text-transform:uppercase;
+  color:var(--dimmer);display:block;margin-bottom:9px;transition:color .2s}
+.choice:hover .kicker,.choice:focus-visible .kicker{color:var(--teal)}
+.choice h2{font:600 19px/1.25 "IBM Plex Sans Condensed",sans-serif;margin:0 0 9px;color:var(--text)}
+.choice h2 .tag{color:var(--amber);letter-spacing:.04em}
+.choice p{font-size:13px;line-height:1.62;color:var(--dim);margin:0 0 20px}
+.go{display:flex;align-items:center;gap:8px;font:500 10px/1 "IBM Plex Mono";
+  letter-spacing:.13em;text-transform:uppercase;color:var(--dimmer);transition:color .2s}
+.choice:hover .go,.choice:focus-visible .go{color:var(--amber-soft)}
+.go svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.choice:hover .go svg{transform:translateX(4px)}
+
+footer{position:fixed;left:0;right:0;bottom:0;z-index:2;padding:14px 20px;text-align:center;
+  font:400 10px/1 "IBM Plex Mono";letter-spacing:.13em;text-transform:uppercase;color:#333d49}
+
+@media (max-width:660px){
+  header{margin-bottom:36px}
+  h1{letter-spacing:.24em;padding-left:.24em}
+  #choices{gap:14px}
+  .choice{flex:1 1 100%;max-width:none;padding:22px 20px 20px}
+  .glyph{width:26px;height:26px;margin-bottom:13px}
+}
+@media (prefers-reduced-motion:reduce){
+  #core{animation:none}
+  .choice,.glyph,.go svg{transition:none}
+}
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div id="core"></div>
+
+<div id="wrap">
+  <header>
+    <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+      <circle class="ring" cx="20" cy="20" r="11"/>
+      <circle class="hole" cx="20" cy="20" r="8.2"/>
+    </svg>
+    <h1>Aster Galaxy Tool</h1>
+    <div class="rule"></div>
+    <p class="tagline">Manual starmap cartography</p>
+  </header>
+
+  <nav id="choices">
+    <a class="choice" href="editor.html">
+      <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M6 26l3-8 12-12a2.6 2.6 0 013.7 3.7l-12 12z"/>
+        <path d="M20.5 7.5l4 4"/>
+        <circle cx="24" cy="24" r="1.1" fill="currentColor" stroke="none"/>
+        <circle cx="28" cy="19" r=".8" fill="currentColor" stroke="none"/>
+        <circle cx="9" cy="6" r=".8" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="kicker">Create</span>
+      <h2>Editor</h2>
+      <p>Build and edit galaxies. Paint stars, chain hyperlanes, claim territory, export at up to 16K.</p>
+      <span class="go">Open editor
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </span>
+    </a>
+
+    <a class="choice" href="map.html">
+      <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="11.5"/>
+        <path d="M16 4.5c3.4 3.2 3.4 20 0 23M16 4.5c-3.4 3.2-3.4 20 0 23"/>
+        <path d="M5 16h22"/>
+        <circle cx="16" cy="16" r="1.4" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="kicker">Explore</span>
+      <h2><span class="tag">[RAIN]</span> Galaxy Map</h2>
+      <p>The living map. Browse systems, read their dossiers, and trace borders between nations.</p>
+      <span class="go">View map
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </span>
+    </a>
+  </nav>
+</div>
+
+<footer>Aster</footer>
+
+<script>
+"use strict";
+/* Drifting star field with a few faint hyperlane threads — the same visual
+   language as the maps themselves, kept cheap enough to idle at 60fps. */
+(function(){
+  const cv = document.getElementById('sky');
+  const g = cv.getContext('2d', {alpha:false});
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W = 0, H = 0, DPR = 1, stars = [], links = [], t = 0;
+  const mouse = {x:0, y:0, tx:0, ty:0};
+
+  function build(){
+    const count = Math.round(Math.min(280, (W*H)/5200));
+    stars = [];
+    for(let i=0; i<count; i++){
+      stars.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        r: Math.random() < 0.08 ? 1.5 + Math.random()*1.1 : 0.45 + Math.random()*0.85,
+        d: 0.25 + Math.random()*0.9,                 /* parallax depth */
+        ph: Math.random()*Math.PI*2,
+        sp: 0.25 + Math.random()*0.55,
+        warm: Math.random() < 0.14
+      });
+    }
+    /* thread a handful of near neighbours together, like lanes on the map */
+    links = [];
+    for(let i=0; i<stars.length && links.length < 46; i++){
+      for(let j=i+1; j<stars.length; j++){
+        const a = stars[i], b = stars[j];
+        if(Math.abs(a.d-b.d) > 0.22) continue;
+        const dx = a.x-b.x, dy = a.y-b.y;
+        const d2 = dx*dx + dy*dy;
+        if(d2 < 21000 && Math.random() < 0.3){ links.push([i,j]); break; }
+      }
+    }
+  }
+  function resize(){
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+    g.setTransform(DPR,0,0,DPR,0,0);
+    build();
+  }
+  addEventListener('resize', resize);
+  addEventListener('pointermove', e => {
+    mouse.tx = (e.clientX/innerWidth - .5) * 2;
+    mouse.ty = (e.clientY/innerHeight - .5) * 2;
+  });
+
+  function frame(){
+    t += reduce ? 0 : 0.006;
+    mouse.x += (mouse.tx - mouse.x) * 0.045;
+    mouse.y += (mouse.ty - mouse.y) * 0.045;
+
+    g.fillStyle = '#05070b';
+    g.fillRect(0, 0, W, H);
+
+    const off = s => ({
+      x: s.x + mouse.x * 17 * s.d + Math.sin(t*s.sp + s.ph) * 1.6 * s.d,
+      y: s.y + mouse.y * 17 * s.d + Math.cos(t*s.sp*0.8 + s.ph) * 1.6 * s.d
+    });
+
+    g.strokeStyle = 'rgba(76,143,155,.15)';
+    g.lineWidth = 0.6;
+    g.beginPath();
+    for(const [i,j] of links){
+      const a = off(stars[i]), b = off(stars[j]);
+      g.moveTo(a.x, a.y); g.lineTo(b.x, b.y);
+    }
+    g.stroke();
+
+    for(const s of stars){
+      const p = off(s);
+      const tw = 0.62 + Math.sin(t*1.7*s.sp + s.ph) * 0.22;
+      g.globalAlpha = Math.max(0.08, tw * (0.34 + s.d*0.52));
+      g.fillStyle = s.warm ? '#f0c07a' : '#cfdcec';
+      g.beginPath();
+      g.arc(p.x, p.y, s.r, 0, 6.2832);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+  resize();
+  frame();
+})();
+</script>
+</body>
+</html>
